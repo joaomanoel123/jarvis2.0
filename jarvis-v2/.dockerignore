@@ -1,0 +1,45 @@
+# Python bytecode — compiled at build time
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Secrets — never in image layer cache
+.env
+.env.*
+!.env.example
+
+# Source control
+.git/
+.gitignore
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test and lint artefacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Model weights should be downloaded at runtime, not shipped in the image
+*.bin
+*.safetensors
+*.gguf
+.cache/
+
+# Documentation and CI
+*.md
+.github/
+docs/

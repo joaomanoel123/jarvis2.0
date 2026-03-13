@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="J.A.R.V.I.S - Holographic AI Interface">
+    <meta name="theme-color" content="#000000">
+    <title>J.A.R.V.I.S - Holographic Interface</title>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Container Principal -->
+    <div id="app-container" class="app-container">
+        
+        <!-- Canvas Three.js -->
+        <canvas id="hologram-canvas"></canvas>
+        
+        <!-- Overlay de Interface -->
+        <div class="interface-overlay">
+            
+            <!-- Header -->
+            <header class="header">
+                <div class="header-content">
+                    <h1 class="title">J.A.R.V.I.S</h1>
+                    <p class="subtitle">Holographic AI Interface</p>
+                </div>
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">ONLINE</span>
+                </div>
+            </header>
+            
+            <!-- Painel Principal -->
+            <main class="main-panel">
+                
+                <!-- Seção de Input -->
+                <section class="input-section">
+                    <div class="input-group">
+                        <input 
+                            type="text" 
+                            id="user-input" 
+                            class="user-input" 
+                            placeholder="Fale com J.A.R.V.I.S..."
+                            autocomplete="off"
+                        >
+                        <button id="send-btn" class="send-button">
+                            <span class="send-icon">→</span>
+                        </button>
+                    </div>
+                </section>
+                
+                <!-- Seção de Resposta -->
+                <section class="response-section">
+                    <div id="response-container" class="response-container">
+                        <p class="response-text">Aguardando entrada...</p>
+                    </div>
+                </section>
+                
+                <!-- Seção de Controles -->
+                <section class="controls-section">
+                    <button id="voice-btn" class="control-button voice-button" title="Ativar voz">
+                        <span class="button-icon">🎤</span>
+                        <span class="button-label">Voz</span>
+                    </button>
+                    <button id="reset-btn" class="control-button reset-button" title="Resetar">
+                        <span class="button-icon">↻</span>
+                        <span class="button-label">Reset</span>
+                    </button>
+                    <button id="info-btn" class="control-button info-button" title="Informações">
+                        <span class="button-icon">ℹ</span>
+                        <span class="button-label">Info</span>
+                    </button>
+                </section>
+                
+            </main>
+            
+            <!-- Footer -->
+            <footer class="footer">
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-label">FPS:</span>
+                        <span id="fps-counter" class="stat-value">60</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">PARTICLES:</span>
+                        <span id="particle-counter" class="stat-value">500</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">STATUS:</span>
+                        <span id="status-indicator" class="stat-value">READY</span>
+                    </div>
+                </div>
+            </footer>
+            
+        </div>
+        
+        <!-- Modal de Informações -->
+        <div id="info-modal" class="modal hidden">
+            <div class="modal-content">
+                <button class="modal-close">&times;</button>
+                <h2>Sobre J.A.R.V.I.S</h2>
+                <p>Interface Holográfica Futurista</p>
+                <p>Desenvolvido com Three.js e WebGL</p>
+                <p>Inspirado no sistema JARVIS do Homem de Ferro</p>
+                <div class="modal-features">
+                    <h3>Recursos:</h3>
+                    <ul>
+                        <li>✓ Renderização 3D em tempo real</li>
+                        <li>✓ Partículas animadas</li>
+                        <li>✓ Anéis rotativos</li>
+                        <li>✓ Núcleo pulsante</li>
+                        <li>✓ Responsivo para mobile</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+    
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Scripts da Aplicação -->
+    <script src="hologram.js"></script>
+    
+</body>
+</html>
