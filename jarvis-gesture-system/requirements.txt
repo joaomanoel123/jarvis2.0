@@ -1,0 +1,25 @@
+# ════════════════════════════════════════════════════════
+#  JARVIS 2.0 — Gesture Recognition System
+#  Python 3.10+
+# ════════════════════════════════════════════════════════
+
+# ── Core vision ───────────────────────────────────────────
+opencv-python>=4.9.0
+mediapipe>=0.10.14
+
+# ── Numerics ──────────────────────────────────────────────
+numpy>=1.26.0
+
+# ── WebSocket client ──────────────────────────────────────
+websockets>=12.0
+
+# ── ML classifier (optional) ──────────────────────────────
+scikit-learn>=1.4.0
+
+# ── FastAPI backend integration ───────────────────────────
+# (already in jarvis-v2/requirements.txt — listed here for standalone use)
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+
+# ── Testing ───────────────────────────────────────────────
+pytest>=8.0.0
