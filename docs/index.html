@@ -2,127 +2,185 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="J.A.R.V.I.S - Holographic AI Interface">
-    <meta name="theme-color" content="#000000">
-    <title>J.A.R.V.I.S - Holographic Interface</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS 2.0 - AI Control Center</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Container Principal -->
-    <div id="app-container" class="app-container">
+    <!-- Canvas para renderização Three.js -->
+    <canvas id="three-canvas"></canvas>
+
+    <!-- Container principal da interface -->
+    <div id="interface-container" class="interface-container">
         
-        <!-- Canvas Three.js -->
-        <canvas id="hologram-canvas"></canvas>
-        
-        <!-- Overlay de Interface -->
-        <div class="interface-overlay">
-            
-            <!-- Header -->
-            <header class="header">
-                <div class="header-content">
-                    <h1 class="title">J.A.R.V.I.S</h1>
-                    <p class="subtitle">Holographic AI Interface</p>
-                </div>
+        <!-- BARRA DE SISTEMA - TOPO -->
+        <div class="system-bar">
+            <div class="system-bar-left">
                 <div class="status-indicator">
                     <span class="status-dot"></span>
-                    <span class="status-text">ONLINE</span>
+                    <span class="status-text">CONECTADO</span>
                 </div>
-            </header>
-            
-            <!-- Painel Principal -->
-            <main class="main-panel">
-                
-                <!-- Seção de Input -->
-                <section class="input-section">
-                    <div class="input-group">
-                        <input 
-                            type="text" 
-                            id="user-input" 
-                            class="user-input" 
-                            placeholder="Fale com J.A.R.V.I.S..."
-                            autocomplete="off"
-                        >
-                        <button id="send-btn" class="send-button">
-                            <span class="send-icon">→</span>
-                        </button>
-                    </div>
-                </section>
-                
-                <!-- Seção de Resposta -->
-                <section class="response-section">
-                    <div id="response-container" class="response-container">
-                        <p class="response-text">Aguardando entrada...</p>
-                    </div>
-                </section>
-                
-                <!-- Seção de Controles -->
-                <section class="controls-section">
-                    <button id="voice-btn" class="control-button voice-button" title="Ativar voz">
-                        <span class="button-icon">🎤</span>
-                        <span class="button-label">Voz</span>
-                    </button>
-                    <button id="reset-btn" class="control-button reset-button" title="Resetar">
-                        <span class="button-icon">↻</span>
-                        <span class="button-label">Reset</span>
-                    </button>
-                    <button id="info-btn" class="control-button info-button" title="Informações">
-                        <span class="button-icon">ℹ</span>
-                        <span class="button-label">Info</span>
-                    </button>
-                </section>
-                
-            </main>
-            
-            <!-- Footer -->
-            <footer class="footer">
-                <div class="stats">
-                    <div class="stat-item">
-                        <span class="stat-label">FPS:</span>
-                        <span id="fps-counter" class="stat-value">60</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">PARTICLES:</span>
-                        <span id="particle-counter" class="stat-value">500</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">STATUS:</span>
-                        <span id="status-indicator" class="stat-value">READY</span>
-                    </div>
+                <div class="agent-counter">
+                    <span class="label">AGENTES:</span>
+                    <span class="value" id="agent-count">0</span>
                 </div>
-            </footer>
+            </div>
             
-        </div>
-        
-        <!-- Modal de Informações -->
-        <div id="info-modal" class="modal hidden">
-            <div class="modal-content">
-                <button class="modal-close">&times;</button>
-                <h2>Sobre J.A.R.V.I.S</h2>
-                <p>Interface Holográfica Futurista</p>
-                <p>Desenvolvido com Three.js e WebGL</p>
-                <p>Inspirado no sistema JARVIS do Homem de Ferro</p>
-                <div class="modal-features">
-                    <h3>Recursos:</h3>
-                    <ul>
-                        <li>✓ Renderização 3D em tempo real</li>
-                        <li>✓ Partículas animadas</li>
-                        <li>✓ Anéis rotativos</li>
-                        <li>✓ Núcleo pulsante</li>
-                        <li>✓ Responsivo para mobile</li>
-                    </ul>
+            <div class="system-bar-center">
+                <h1 class="jarvis-title">JARVIS 2.0</h1>
+            </div>
+            
+            <div class="system-bar-right">
+                <div class="system-metric">
+                    <span class="label">CPU:</span>
+                    <span class="value" id="cpu-usage">0%</span>
+                </div>
+                <div class="system-metric">
+                    <span class="label">MEMÓRIA:</span>
+                    <span class="value" id="memory-usage">0%</span>
                 </div>
             </div>
         </div>
-        
+
+        <!-- PAINEL ESQUERDO - INFORMAÇÕES DO SISTEMA -->
+        <div class="left-panel panel">
+            <div class="panel-header">
+                <h2 class="panel-title">SISTEMA</h2>
+                <div class="panel-indicator"></div>
+            </div>
+            
+            <div class="panel-content">
+                <!-- Status do Sistema -->
+                <div class="info-section">
+                    <h3 class="section-title">Status</h3>
+                    <div class="info-item">
+                        <span class="info-label">Núcleos Ativos:</span>
+                        <span class="info-value" id="active-cores">4</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Temperatura:</span>
+                        <span class="info-value" id="temperature">36°C</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Uptime:</span>
+                        <span class="info-value" id="uptime">00:00:00</span>
+                    </div>
+                </div>
+
+                <!-- Atividade do Agente -->
+                <div class="info-section">
+                    <h3 class="section-title">Atividade</h3>
+                    <div class="activity-log" id="activity-log">
+                        <div class="log-entry">Sistema inicializado</div>
+                    </div>
+                </div>
+
+                <!-- Logs de Memória -->
+                <div class="info-section">
+                    <h3 class="section-title">Memória</h3>
+                    <div class="memory-log" id="memory-log">
+                        <div class="log-entry">Memória: 512 MB</div>
+                    </div>
+                </div>
+
+                <!-- Execução de Tarefas -->
+                <div class="info-section">
+                    <h3 class="section-title">Tarefas</h3>
+                    <div class="task-list" id="task-list">
+                        <div class="task-item">
+                            <span class="task-status">●</span>
+                            <span class="task-name">Inicialização</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NÚCLEO CENTRAL - RENDERIZADO COM THREE.JS -->
+        <div id="three-container" class="three-container"></div>
+
+        <!-- PAINEL DIREITO - RESPOSTAS E HISTÓRICO -->
+        <div class="right-panel panel">
+            <div class="panel-header">
+                <h2 class="panel-title">COMUNICAÇÃO</h2>
+                <div class="panel-indicator"></div>
+            </div>
+            
+            <div class="panel-content">
+                <!-- Resposta Atual do AI -->
+                <div class="info-section">
+                    <h3 class="section-title">Resposta</h3>
+                    <div class="ai-response" id="ai-response">
+                        <p>Olá, sou JARVIS 2.0. Pronto para assistir.</p>
+                    </div>
+                </div>
+
+                <!-- Histórico de Conversas -->
+                <div class="info-section">
+                    <h3 class="section-title">Histórico</h3>
+                    <div class="conversation-history" id="conversation-history">
+                        <div class="conversation-item">
+                            <span class="timestamp">[00:00:00]</span>
+                            <span class="message">Sistema inicializado</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DOCK DE CONTROLE - INFERIOR -->
+        <div class="control-dock">
+            <div class="dock-item" id="voice-control" title="Ativação por Voz">
+                <div class="dock-icon">🎤</div>
+                <span class="dock-label">Voz</span>
+            </div>
+            
+            <div class="dock-item" id="gesture-control" title="Sistema de Gestos">
+                <div class="dock-icon">👆</div>
+                <span class="dock-label">Gestos</span>
+            </div>
+            
+            <div class="dock-item" id="menu-control" title="Menu Principal">
+                <div class="dock-icon">☰</div>
+                <span class="dock-label">Menu</span>
+            </div>
+            
+            <div class="dock-item" id="settings-control" title="Configurações">
+                <div class="dock-icon">⚙️</div>
+                <span class="dock-label">Config</span>
+            </div>
+            
+            <div class="dock-item" id="help-control" title="Ajuda">
+                <div class="dock-icon">❓</div>
+                <span class="dock-label">Ajuda</span>
+            </div>
+        </div>
+
+        <!-- MODAL DE ENTRADA DE COMANDO -->
+        <div id="command-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Enviar Comando</h2>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="command-input" placeholder="Digite seu comando...">
+                </div>
+                <div class="modal-footer">
+                    <button id="send-command" class="btn-primary">Enviar</button>
+                    <button id="cancel-command" class="btn-secondary">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- NOTIFICAÇÕES -->
+        <div id="notification-container" class="notification-container"></div>
     </div>
-    
-    <!-- Three.js Library -->
+
+    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
-    <!-- Scripts da Aplicação -->
-    <script src="hologram.js"></script>
-    
+    <script src="websocket-client.js"></script>
+    <script src="three-scene.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>
