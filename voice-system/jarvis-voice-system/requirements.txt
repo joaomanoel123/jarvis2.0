@@ -1,0 +1,80 @@
+# ════════════════════════════════════════════════════════════════════
+#  JARVIS 2.0 — Voice Command System
+#  Python 3.10+
+# ════════════════════════════════════════════════════════════════════
+
+# ── Audio capture ─────────────────────────────────────────────────────────────
+# Primary backend (recommended — simpler install)
+sounddevice>=0.4.6
+
+# Fallback backend (alternative to sounddevice)
+# PyAudio is trickier to install (needs portaudio-dev system package)
+# pyaudio>=0.2.14
+
+# ── Numerics ──────────────────────────────────────────────────────────────────
+numpy>=1.26.0
+
+# ── Speech-to-Text backends ───────────────────────────────────────────────────
+
+# Option A: OpenAI Whisper (local, recommended — best accuracy)
+# Installs: openai-whisper + ffmpeg-python
+openai-whisper>=20231117
+# Also install ffmpeg system package:
+#   Ubuntu:  sudo apt install ffmpeg
+#   macOS:   brew install ffmpeg
+#   Windows: choco install ffmpeg
+
+# Option B: Google Speech Recognition (cloud, requires internet)
+SpeechRecognition>=3.10.4
+
+# Option C: OpenAI Whisper API (cloud, requires OPENAI_API_KEY)
+# openai>=1.12.0
+
+# Option D: Vosk (fully offline, lower accuracy)
+# vosk>=0.3.45
+# Download model from https://alphacephei.com/vosk/models
+
+# ── Wake word detection ───────────────────────────────────────────────────────
+
+# Porcupine (recommended for production — built-in "jarvis" keyword)
+# Free access key: https://console.picovoice.ai/
+pvporcupine>=3.0.0
+
+# ── Text-to-Speech feedback ───────────────────────────────────────────────────
+pyttsx3>=2.90
+
+# ── HTTP client (backend integration) ────────────────────────────────────────
+requests>=2.32.0
+
+# ── Input simulation (media keys) ─────────────────────────────────────────────
+pynput>=1.7.6
+
+# ── Optional: screenshot support ─────────────────────────────────────────────
+# Pillow>=10.0.0
+
+# ── FastAPI integration (already in jarvis-v2 — listed for standalone use) ───
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.10.0
+
+# ── ML (required for Whisper) ─────────────────────────────────────────────────
+torch>=2.0.0
+# For GPU (CUDA) install torch separately:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest>=8.0.0
+
+# ════════════════════════════════════════════════════════════════════
+#  Quick install (CPU-only, no GPU):
+#
+#  # System dependencies (Ubuntu)
+#  sudo apt install ffmpeg portaudio19-dev espeak
+#
+#  # Python packages
+#  pip install sounddevice numpy openai-whisper SpeechRecognition \
+#              pyttsx3 requests pynput pvporcupine fastapi uvicorn pydantic
+#
+#  # Quick start (no wake word, no Whisper model download)
+#  python voice_main.py --stt-backend google --always-on --dry-run
+# ════════════════════════════════════════════════════════════════════
