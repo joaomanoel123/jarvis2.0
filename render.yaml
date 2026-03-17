@@ -1,0 +1,88 @@
+# ════════════════════════════════════════════════════════════════════
+#  JARVIS 2.0 — Render Deployment Manifest
+#
+#  Deploy options:
+#  ──────────────────────────────────────────────────────────────────
+#  TinyLlama (1.1B, CPU)    →  starter plan  (512 MB RAM) — development
+#  Phi-2     (2.7B, CPU)    →  standard plan (2 GB RAM)
+#  Mistral-7B (4-bit, GPU)  →  GPU plan      (A10G)
+#
+#  Render dashboard:
+#    New → Web Service → Connect repo → Use this render.yaml
+# ════════════════════════════════════════════════════════════════════
+
+services:
+  - type: web
+    name: jarvis-v2-backend
+    runtime: python
+    region: oregon
+
+    # ── Build ────────────────────────────────────────────────────────
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 10000
+
+    # ── Resources ────────────────────────────────────────────────────
+    # Change to 'standard' for Phi-2, 'pro' for Mistral-7B CPU
+    plan: starter
+
+    healthCheckPath: /health
+    autoDeploy: true
+
+    # ── Persistent disk (HuggingFace + vector memory cache) ─────────
+    disk:
+      name: jarvis-data
+      mountPath: /app/data
+      sizeGB: 10
+
+    # ── Environment variables ────────────────────────────────────────
+    envVars:
+      # ── Model selection ──────────────────────────────────────────
+      - key: LLM_MODEL_ID
+        value: tinyllama           # aliases: mistral-7b, phi-2, phi-3-mini, llama-3
+
+      - key: HF_TOKEN
+        sync: false                # paste in Render dashboard
+
+      - key: LLM_DEVICE
+        value: cpu                 # set to cuda on GPU plans
+
+      - key: LLM_LOAD_IN_4BIT
+        value: "false"             # set true on GPU only
+
+      - key: LLM_MAX_NEW_TOKENS
+        value: "1024"
+
+      - key: LLM_TEMPERATURE
+        value: "0.7"
+
+      # ── Tools ────────────────────────────────────────────────────
+      - key: ALLOWED_TOOLS
+        value: web_search,run_python_code,file_reader,system_status,open_url
+
+      - key: TOOL_TIMEOUT_SECONDS
+        value: "30"
+
+      # ── Memory ───────────────────────────────────────────────────
+      - key: SESSION_TTL_SECONDS
+        value: "7200"
+
+      - key: VECTOR_MEMORY_DIR
+        value: /app/data/vector_memory
+
+      # ── Application ──────────────────────────────────────────────
+      - key: APP_NAME
+        value: JARVIS
+
+      - key: APP_VERSION
+        value: "2.0.0"
+
+      - key: DEBUG
+        value: "false"
+
+      # CORS — add your GitHub Pages URL here
+      - key: ALLOWED_ORIGINS
+        value: "http://localhost:3000,https://joaomanoel123.github.io"
+
+      # ── Python path (for module imports) ─────────────────────────
+      - key: PYTHONPATH
+        value: /app/backend:/app/voice-system:/app/gesture-system

@@ -1,0 +1,73 @@
+# ════════════════════════════════════════════════════════════════════
+#  JARVIS 2.0 — Unified Requirements
+#  Python 3.10+  |  Updated: 2026-03
+# ════════════════════════════════════════════════════════════════════
+
+# ── Web framework ─────────────────────────────────────────────────────────────
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+pydantic-settings==2.6.1
+websockets>=12.0
+
+# ── HTTP client ───────────────────────────────────────────────────────────────
+httpx==0.28.1
+requests>=2.32.0
+
+# ── HuggingFace / LLM stack ───────────────────────────────────────────────────
+transformers==4.47.1
+torch==2.5.1                     # CPU build; see GPU note below
+accelerate==1.2.1
+sentencepiece==0.2.0
+huggingface-hub==0.27.0
+safetensors==0.4.5
+# GPU: pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+# ── Vector memory ─────────────────────────────────────────────────────────────
+sentence-transformers>=2.7.0     # all-MiniLM-L6-v2 embeddings
+faiss-cpu>=1.8.0                 # GPU: faiss-gpu
+
+# ── Vision / Gesture system ───────────────────────────────────────────────────
+opencv-python>=4.9.0
+mediapipe>=0.10.14
+numpy>=1.26.0
+
+# ── Voice system ──────────────────────────────────────────────────────────────
+sounddevice>=0.4.6              # microphone capture
+SpeechRecognition>=3.10.4       # Google STT fallback
+openai-whisper>=20231117        # local Whisper STT
+pyttsx3>=2.90                   # TTS feedback
+pynput>=1.7.6                   # media keys
+pvporcupine>=3.0.0              # wake word detection
+
+# ── System / OS tools ─────────────────────────────────────────────────────────
+psutil>=6.1.0                   # CPU / RAM / disk metrics
+
+# ── Optional: ML classifier for gestures ─────────────────────────────────────
+scikit-learn>=1.4.0
+
+# ── Optional: 4-bit quantisation (GPU only) ───────────────────────────────────
+# bitsandbytes==0.44.1
+# scipy==1.14.1
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest>=8.0.0
+pytest-asyncio>=0.25.0
+anyio>=4.7.0
+httpx>=0.28.1
+
+# ── Code quality ──────────────────────────────────────────────────────────────
+ruff>=0.8.4
+
+# ════════════════════════════════════════════════════════════════════
+#  Render CPU-only quick install (no GPU):
+#
+#  pip install fastapi uvicorn pydantic pydantic-settings httpx requests \
+#              transformers torch accelerate sentencepiece huggingface-hub \
+#              safetensors sentence-transformers faiss-cpu numpy \
+#              opencv-python mediapipe scikit-learn psutil websockets \
+#              SpeechRecognition pyttsx3 requests
+#
+#  Render start command:
+#    uvicorn main:app --host 0.0.0.0 --port 10000
+# ════════════════════════════════════════════════════════════════════
