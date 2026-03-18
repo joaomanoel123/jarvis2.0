@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>J.A.R.V.I.S 2.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --arc:   #00e5ff; --arc2: #00b8d4; --arc3: #006064;
+  --gold:  #ffd600; --red:  #ff1744; --green:#00e676;
+  --void:  #000308; --panel:rgba(0,6,16,0.93); --card:rgba(0,15,32,0.80);
+  --b0:    rgba(0,229,255,0.14); --b1:rgba(0,229,255,0.40);
+  --text:  #cce7ec; --text2:#5e8a90; --text3:#1e3a40;
+  --hud:  "Share Tech Mono",monospace;
+  --title:"Orbitron",sans-serif;
+  --body: "Rajdhani",sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--void);color:var(--text);font-family:var(--hud)}
+
+/* Grid */
+.hud-bg{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(0,229,255,0.02) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(0,229,255,0.02) 1px,transparent 1px);
+  background-size:48px 48px}
+.scanline{position:fixed;left:0;right:0;height:2px;z-index:1;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(0,229,255,0.1) 50%,transparent);
+  animation:scan 7s linear infinite}
+@keyframes scan{0%{top:-2px}100%{top:100%}}
+
+/* Layout */
+#app{position:fixed;inset:0;z-index:10;display:grid;
+  grid-template-columns:240px 1fr 240px;
+  grid-template-rows:52px 1fr 68px;padding:7px;gap:0}
+
+/* Panel */
+.panel{background:var(--panel);border:1px solid var(--b0);backdrop-filter:blur(18px) saturate(160%);position:relative;overflow:hidden}
+.panel::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:
+    linear-gradient(var(--arc),var(--arc)) top left/14px 1px no-repeat,
+    linear-gradient(var(--arc),var(--arc)) top left/1px 14px no-repeat,
+    linear-gradient(var(--arc),var(--arc)) top right/14px 1px no-repeat,
+    linear-gradient(var(--arc),var(--arc)) top right/1px 14px no-repeat,
+    linear-gradient(var(--arc),var(--arc)) bottom left/14px 1px no-repeat,
+    linear-gradient(var(--arc),var(--arc)) bottom left/1px 14px no-repeat,
+    linear-gradient(var(--arc),var(--arc)) bottom right/14px 1px no-repeat,
+    linear-gradient(var(--arc),var(--arc)) bottom right/1px 14px no-repeat;
+  opacity:.5}
+.s-label{font-size:7px;letter-spacing:3px;color:var(--text2);text-transform:uppercase;
+  padding-bottom:5px;border-bottom:1px solid var(--b0);margin-bottom:7px}
+
+/* Header */
+#header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px;margin-bottom:6px;background:linear-gradient(90deg,rgba(0,229,255,0.05),transparent 30%,transparent 70%,rgba(0,229,255,0.05));
+  border-bottom:1px solid var(--b0)}
+.hdr-logo{font-family:var(--title);font-size:17px;font-weight:900;color:var(--arc);letter-spacing:7px;text-shadow:0 0 18px rgba(0,229,255,.5)}
+.hdr-sub{font-size:7px;color:var(--text2);letter-spacing:4px;margin-top:1px}
+.hdr-c{display:flex;gap:22px}
+.hdr-stat{text-align:center}
+.hdr-sv{font-family:var(--title);font-size:11px;color:var(--arc)}
+.hdr-sl{font-size:6px;color:var(--text2);letter-spacing:2px;margin-top:1px}
+.hdr-r{display:flex;align-items:center;gap:8px}
+
+/* State badge */
+.state-badge{display:flex;align-items:center;gap:5px;padding:3px 10px;border:1px solid var(--b0);background:rgba(0,229,255,0.04);font-size:8px;letter-spacing:2px}
+.j-dot{width:6px;height:6px;border-radius:50%;background:var(--text2);transition:all .3s}
+.j-dot.standby{}
+.j-dot.listening{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse .8s ease-in-out infinite}
+.j-dot.processing{background:var(--gold);box-shadow:0 0 8px var(--gold);animation:spin .5s linear infinite}
+.j-dot.responding{background:var(--arc);box-shadow:0 0 8px var(--arc);animation:pulse .6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.65)}}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+
+/* Left */
+#left{grid-row:2;grid-column:1;padding:11px;margin-right:6px;display:flex;flex-direction:column;gap:9px;overflow:hidden}
+.agent-node{display:flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--b0);background:rgba(0,229,255,.02);font-size:9px;letter-spacing:1px;transition:all .3s}
+.agent-node::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--arc);opacity:0;transition:opacity .3s}
+.agent-node{position:relative}
+.agent-node.active{border-color:rgba(0,229,255,.5);background:rgba(0,229,255,.07)}
+.agent-node.active::before{opacity:1}
+.a-icon{font-size:11px;width:14px;text-align:center;flex-shrink:0}
+.a-name{flex:1;color:var(--text2)}
+.agent-node.active .a-name{color:var(--text)}
+.a-dot{width:4px;height:4px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:all .3s}
+.agent-node.active .a-dot{background:var(--arc);box-shadow:0 0 5px var(--arc);animation:pulse .7s ease-in-out infinite}
+.a-conn{width:1px;height:6px;background:var(--b0);margin-left:16px}
+.metric-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(0,229,255,.04);font-size:9px}
+.m-k{color:var(--text2)}.m-v{color:var(--arc);font-family:var(--title);font-size:10px}
+.m-v.ok{color:var(--green)}.m-v.warn{color:var(--gold)}.m-v.err{color:var(--red)}
+
+/* Center */
+#center{grid-row:2;grid-column:2;display:flex;flex-direction:column;background:transparent;border:none;overflow:hidden}
+#center::after{display:none}
+#chat-log{flex:1;overflow-y:auto;padding:10px 14px;scrollbar-width:thin;scrollbar-color:var(--arc2) transparent}
+#chat-log::-webkit-scrollbar{width:3px}
+#chat-log::-webkit-scrollbar-thumb{background:var(--arc2)}
+
+/* Messages */
+.j-msg{display:flex;gap:8px;margin-bottom:9px;animation:msg-in .3s ease-out}
+@keyframes msg-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.j-av{width:22px;height:22px;border-radius:1px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-family:var(--title);border:1px solid}
+.j-user .j-av{border-color:var(--gold);color:var(--gold);background:rgba(255,214,0,.06)}
+.j-bot  .j-av{border-color:var(--arc); color:var(--arc); background:rgba(0,229,255,.06)}
+.j-body{flex:1;min-width:0}
+.j-meta{font-size:7px;color:var(--text2);letter-spacing:1px;margin-bottom:2px;display:flex;gap:6px;align-items:center}
+.j-badge{padding:1px 5px;border:1px solid rgba(0,229,255,.2);color:var(--arc);font-size:7px;letter-spacing:.5px}
+.j-text{font-family:var(--body);font-size:13px;color:var(--text);line-height:1.55;word-break:break-word}
+.j-user .j-text{color:rgba(255,214,0,.85)}
+.j-action{margin-top:4px;padding:4px 7px;background:rgba(0,229,255,.04);border-left:2px solid var(--arc2);font-size:8px;color:var(--arc2)}
+.j-ak{color:var(--text2);margin-right:4px}
+.j-dots{display:inline-flex;gap:3px}
+.j-dots span{width:4px;height:4px;border-radius:50%;background:var(--arc);animation:dot-p 1.2s ease-in-out infinite}
+.j-dots span:nth-child(2){animation-delay:.2s}.j-dots span:nth-child(3){animation-delay:.4s}
+@keyframes dot-p{0%,80%,100%{transform:scale(0);opacity:.3}40%{transform:scale(1);opacity:1}}
+
+/* Right */
+#right{grid-row:2;grid-column:3;padding:11px;margin-left:6px;display:flex;flex-direction:column;gap:9px;overflow:hidden}
+.g-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:6px}
+.g-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border:1px solid rgba(0,229,255,.12);background:rgba(0,229,255,.02);cursor:pointer;font-size:13px;user-select:none;transition:all .15s}
+.g-btn:hover{border-color:var(--arc);background:rgba(0,229,255,.09);box-shadow:0 0 8px rgba(0,229,255,.25)}
+.g-btn:active{transform:scale(.91)}
+.g-lbl{font-size:7px;color:var(--text2);letter-spacing:.5px;text-align:center}
+.conn-row{display:flex;align-items:center;gap:6px;padding:3px 0}
+.c-dot{width:5px;height:5px;border-radius:50%;background:var(--text2);flex-shrink:0}
+.c-dot.live{background:var(--green);box-shadow:0 0 5px var(--green)}
+.c-dot.dead{background:var(--red)}
+.c-lbl{font-size:9px;color:var(--text2);flex:1}
+.c-val{font-size:9px;color:var(--text)}
+
+/* Input bar */
+#input-bar{grid-column:1/-1;grid-row:3;display:flex;align-items:center;gap:7px;padding:7px 12px;margin-top:6px;
+  background:rgba(0,4,12,.95);border:1px solid var(--b0);border-top-color:rgba(0,229,255,.35);backdrop-filter:blur(22px)}
+.i-prefix{font-family:var(--title);font-size:9px;color:var(--arc);letter-spacing:2px;flex-shrink:0;opacity:.7}
+#j-input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:var(--hud);font-size:13px;caret-color:var(--arc);min-width:0}
+#j-input::placeholder{color:var(--text2);opacity:.4}
+.i-sep{width:1px;height:22px;background:var(--b0)}
+.j-iact{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--b0);background:rgba(0,229,255,.04);color:var(--arc);cursor:pointer;font-size:13px;flex-shrink:0;transition:all .15s;user-select:none}
+.j-iact:hover{border-color:var(--arc);background:rgba(0,229,255,.12)}
+.j-iact:active{transform:scale(.93)}
+.j-iact.active{background:rgba(255,23,68,.14);border-color:var(--red);animation:pulse .5s ease-in-out infinite}
+.j-iact.primary{width:auto;padding:0 14px;gap:5px;background:rgba(0,229,255,.09);border-color:var(--arc2);font-family:var(--title);font-size:8px;letter-spacing:2px}
+.j-iact.primary:hover{background:rgba(0,229,255,.18)}
+
+@media(max-width:800px){
+  #app{grid-template-columns:1fr;grid-template-rows:48px 1fr 62px;padding:5px}
+  #left,#right{display:none}#center{grid-column:1}#input-bar{grid-column:1}
+}
+</style>
+</head>
+<body>
+<div class="hud-bg"></div>
+<div class="scanline"></div>
+
+<div id="app">
+
+  <!-- Header -->
+  <div id="header" class="panel">
+    <div><div class="hdr-logo">J.A.R.V.I.S</div><div class="hdr-sub">Multi-Agent AI · v2.0</div></div>
+    <div class="hdr-c">
+      <div class="hdr-stat"><div class="hdr-sv" id="j-intent">—</div><div class="hdr-sl">INTENT</div></div>
+      <div class="hdr-stat"><div class="hdr-sv" id="j-latency">—</div><div class="hdr-sl">LATENCY ms</div></div>
+      <div class="hdr-stat"><div class="hdr-sv" id="j-model">loading…</div><div class="hdr-sl">MODEL</div></div>
+    </div>
+    <div class="hdr-r">
+      <div class="state-badge"><div class="j-dot standby" id="j-dot"></div><span id="j-status">STANDBY</span></div>
+    </div>
+  </div>
+
+  <!-- Left panel -->
+  <div id="left" class="panel">
+    <div class="s-label">Agent Pipeline</div>
+    <div class="agent-node" id="an-planner"><div class="a-icon">📋</div><div class="a-name">PlannerAgent</div><div class="a-dot"></div></div>
+    <div class="a-conn"></div>
+    <div class="agent-node" id="an-executor"><div class="a-icon">⚡</div><div class="a-name">ExecutorAgent</div><div class="a-dot"></div></div>
+    <div class="a-conn"></div>
+    <div class="agent-node" id="an-memory"><div class="a-icon">🧠</div><div class="a-name">MemoryAgent</div><div class="a-dot"></div></div>
+    <div class="a-conn"></div>
+    <div class="agent-node" id="an-iface"><div class="a-icon">🌐</div><div class="a-name">InterfaceAgent</div><div class="a-dot"></div></div>
+
+    <div class="s-label" style="margin-top:6px">Telemetry</div>
+    <div class="metric-row"><span class="m-k">Backend</span><span class="m-v ok" id="m-backend">—</span></div>
+    <div class="metric-row"><span class="m-k">Sessions</span><span class="m-v" id="m-sess">—</span></div>
+    <div class="metric-row"><span class="m-k">Voice</span><span class="m-v" id="m-voice">—</span></div>
+  </div>
+
+  <!-- Center -->
+  <div id="center">
+    <div id="chat-log"></div>
+  </div>
+
+  <!-- Right panel -->
+  <div id="right" class="panel">
+    <div class="s-label">Gesture Control</div>
+    <div class="g-grid">
+      <div class="g-btn" onclick="sendGesture('open_hand')">🖐<span class="g-lbl">OPEN</span></div>
+      <div class="g-btn" onclick="sendGesture('fist')">✊<span class="g-lbl">FIST</span></div>
+      <div class="g-btn" onclick="sendGesture('swipe_right')">→<span class="g-lbl">NEXT</span></div>
+      <div class="g-btn" onclick="sendGesture('swipe_left')">←<span class="g-lbl">PREV</span></div>
+      <div class="g-btn" onclick="sendGesture('swipe_up')">↑<span class="g-lbl">UP</span></div>
+      <div class="g-btn" onclick="sendGesture('swipe_down')">↓<span class="g-lbl">DOWN</span></div>
+      <div class="g-btn" onclick="sendGesture('zoom_in')">🔎<span class="g-lbl">ZOOM+</span></div>
+      <div class="g-btn" onclick="sendGesture('thumbs_up')">👍<span class="g-lbl">OK</span></div>
+    </div>
+    <div style="font-size:7px;color:var(--text2);margin-top:4px">Arrow keys also work</div>
+
+    <div class="s-label">Connection</div>
+    <div class="conn-row"><div class="c-dot" id="api-dot"></div><span class="c-lbl">Backend API</span><span class="c-val" id="api-val">—</span></div>
+    <div class="conn-row"><div class="c-dot" id="ws-dot"></div><span class="c-lbl">WebSocket</span><span class="c-val" id="ws-val">—</span></div>
+    <div class="conn-row"><div class="c-dot" id="voice-dot"></div><span class="c-lbl">Voice API</span><span class="c-val" id="voice-val">—</span></div>
+  </div>
+
+  <!-- Input bar -->
+  <div id="input-bar">
+    <div class="i-prefix">&gt;_</div>
+    <input id="j-input" type="text" placeholder="Send a command or ask JARVIS anything…" autocomplete="off" spellcheck="false">
+    <div class="i-sep"></div>
+    <div class="j-iact" id="j-voice" onclick="toggleVoice()" title="Voice Input">🎤</div>
+    <div class="j-iact primary" onclick="sendMessage()">SEND ⇒</div>
+  </div>
+
+</div>
+
+<!-- Scripts: load in dependency order -->
+<script src="apiClient.js"></script>
+<script src="commandExecutor.js"></script>
+<script src="voiceHandler.js"></script>
+<script src="gestureHandler.js"></script>
+<script src="main.js"></script>
+
+<script>
+// ── Boot-time UI wiring ────────────────────────────────────────────────
+
+// WS connection indicators
+ApiClient.connectWebSocket((msg) => {
+  if (msg.type === 'ws_connected') {
+    document.getElementById('ws-dot').className = 'c-dot live';
+    document.getElementById('ws-val').textContent = 'LIVE';
+  }
+  if (msg.type === 'ws_disconnected') {
+    document.getElementById('ws-dot').className = 'c-dot warn';
+    document.getElementById('ws-val').textContent = 'RECONNECTING';
+  }
+});
+
+// Backend health check → update connection dots
+(async () => {
+  try {
+    await ApiClient.fetchHealth();
+    document.getElementById('api-dot').className = 'c-dot live';
+    document.getElementById('api-val').textContent = new URL(ApiClient.getBase()).hostname;
+    document.getElementById('m-backend').className = 'm-v ok';
+    document.getElementById('m-backend').textContent = 'ONLINE';
+  } catch {
+    document.getElementById('api-dot').className = 'c-dot dead';
+    document.getElementById('m-backend').className = 'm-v err';
+    document.getElementById('m-backend').textContent = 'OFFLINE';
+  }
+
+  // Voice API availability
+  if (VoiceHandler.isSupported()) {
+    document.getElementById('voice-dot').className = 'c-dot live';
+    document.getElementById('voice-val').textContent = 'READY';
+    document.getElementById('m-voice').textContent = 'READY';
+  } else {
+    document.getElementById('voice-dot').className = 'c-dot warn';
+    document.getElementById('voice-val').textContent = 'N/A';
+    document.getElementById('m-voice').textContent = 'N/A';
+  }
+})();
+
+// Agent pipeline — highlight on each response
+document.addEventListener('jarvis:ui', () => {});
+
+// Minimal agent highlight wired to main.js appendBot
+const _origAppendBot = window.appendBot;
+// (main.js handles all UI; this just highlights agent nodes)
+document.addEventListener('DOMContentLoaded', () => {
+  const intentEl = document.getElementById('j-intent');
+  // MutationObserver watches intent badge changes and lights up agents accordingly
+  if (intentEl) {
+    new MutationObserver(() => {
+      const intent = intentEl.textContent.toLowerCase();
+      ['an-planner','an-executor','an-memory','an-iface'].forEach(id => {
+        document.getElementById(id)?.classList.remove('active');
+      });
+      const map = {
+        command:        ['an-planner','an-executor'],
+        conversational: ['an-memory','an-iface'],
+        gesture:        ['an-executor','an-iface'],
+        gesture_action: ['an-executor','an-iface'],
+        system_control: ['an-planner','an-executor'],
+      };
+      (map[intent] || ['an-iface']).forEach(id => {
+        document.getElementById(id)?.classList.add('active');
+      });
+      setTimeout(() => {
+        ['an-planner','an-executor','an-memory','an-iface'].forEach(id => {
+          document.getElementById(id)?.classList.remove('active');
+        });
+      }, 3500);
+    }).observe(intentEl, { childList: true, characterData: true, subtree: true });
+  }
+});
+</script>
+</body>
+</html>
