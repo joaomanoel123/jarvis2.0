@@ -1,0 +1,70 @@
+# ════════════════════════════════════════════════════════════════════
+#  JARVIS 2.0 — Render Deployment Manifest
+#
+#  Plans:
+#  ──────────────────────────────────────────────────────────────────
+#  starter   (512 MB) → TinyLlama 1.1B   — development / free tier
+#  standard  (2 GB)   → Phi-2 2.7B       — production CPU
+#  pro       (4 GB)   → Phi-3-mini 3.8B  — high quality CPU
+#  GPU plan           → Mistral-7B 4-bit — best quality
+#
+#  Deploy: Render dashboard → New → Web Service → Connect repo
+#  Render auto-detects this file.
+# ════════════════════════════════════════════════════════════════════
+
+services:
+  - type: web
+    name: jarvis-v2-core
+    runtime: python
+    region: oregon
+
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 10000
+
+    plan: starter        # change to standard/pro for larger models
+    healthCheckPath: /health
+    autoDeploy: true
+
+    # Persistent disk — stores SQLite DB + HuggingFace model cache
+    disk:
+      name: jarvis-data
+      mountPath: /app/data
+      sizeGB: 15
+
+    envVars:
+      # ── LLM ────────────────────────────────────────────────────
+      - key: LLM_MODEL_ID
+        value: tinyllama      # options: phi-2, phi-3-mini, mistral-7b, llama-3
+
+      - key: HF_TOKEN
+        sync: false           # paste secret in Render dashboard
+
+      - key: LLM_DEVICE
+        value: cpu
+
+      - key: LLM_LOAD_IN_4BIT
+        value: "false"        # true for GPU plans only
+
+      - key: LLM_MAX_NEW_TOKENS
+        value: "512"
+
+      - key: LLM_TEMPERATURE
+        value: "0.7"
+
+      # ── Database ────────────────────────────────────────────────
+      - key: DB_PATH
+        value: /app/data/jarvis.db
+
+      # ── Application ─────────────────────────────────────────────
+      - key: ALLOWED_ORIGINS
+        value: "https://joaomanoel123.github.io,http://localhost:3000,http://localhost:5500"
+
+      - key: LOG_LEVEL
+        value: INFO
+
+      - key: DEBUG
+        value: "false"
+
+      # ── Python path ─────────────────────────────────────────────
+      - key: PYTHONPATH
+        value: /app
