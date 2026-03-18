@@ -1,29 +1,39 @@
-# JARVIS 2.0 — Backend Requirements
-# Python 3.10+
+# ════════════════════════════════════════════════════════
+#  JARVIS v2 — Python dependencies
+#  Python 3.12  |  Generated: 2026-03
+# ════════════════════════════════════════════════════════
 
-# ── Web framework ────────────────────────────────────────────────────
+# ── Web framework ─────────────────────────────────────────
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
 pydantic==2.10.3
+pydantic-settings==2.6.1
 
-# ── LLM stack ────────────────────────────────────────────────────────
+# ── HTTP client (async, used by web_search and tools) ─────
+httpx==0.28.1
+requests>=2.32.0         # HuggingFace Hub transitive dependency
+
+# ── HuggingFace / LLM stack ───────────────────────────────
 transformers==4.47.1
-torch==2.5.1            # CPU; GPU: pip install torch --index-url https://download.pytorch.org/whl/cu121
-accelerate==1.2.1
-sentencepiece==0.2.0
+torch==2.5.1              # CPU build by default; swap for torch+cu121 on GPU
+accelerate==1.2.1         # required for device_map="auto"
+sentencepiece==0.2.0      # tokenizer for Mistral, LLaMA
 huggingface-hub==0.27.0
 safetensors==0.4.5
 
-# ── HTTP client ──────────────────────────────────────────────────────
-requests>=2.32.0
-httpx>=0.28.1
+# ── Optional: 4-bit quantisation (GPU only) ───────────────
+# Uncomment on GPU hosts — comment out for CPU-only deploys:
+# bitsandbytes==0.44.1
+# scipy==1.14.1            # bitsandbytes dependency
 
-# ── Utilities ────────────────────────────────────────────────────────
-python-dotenv>=1.0.0
+# ── System metrics (optional but recommended) ─────────────
+psutil==6.1.0
 
-# ── Testing ──────────────────────────────────────────────────────────
-pytest>=8.0.0
-pytest-asyncio>=0.25.0
+# ── Testing ───────────────────────────────────────────────
+pytest==8.3.4
+pytest-asyncio==0.25.0
+anyio==4.7.0
+httpx==0.28.1             # used by TestClient
 
-# ── Start command ────────────────────────────────────────────────────
-# uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+# ── Code quality ──────────────────────────────────────────
+ruff==0.8.4
