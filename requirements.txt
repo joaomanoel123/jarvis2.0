@@ -1,0 +1,12 @@
+pyttsx3
+speechRecognition
+eel
+opencv-python
+pyautogui
+numpy
+Pillow
+playsound
+pywhatkit
+pvporcupine
+pyaudio
+hugchat
