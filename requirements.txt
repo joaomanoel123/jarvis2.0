@@ -1,6 +1,27 @@
-fastapi>=0.115.0
-uvicorn[standard]>=0.29.0
-pydantic>=2.9.0
-openai>=1.30.0
-httpx>=0.27.0
-python-dotenv>=1.0.1
+# === ARQUIVO: backend/requirements.txt ===
+# JARVIS 2.0 — ANTIGRAVITY Edition
+# Provedor LLM: OpenRouter (via openai SDK com base_url customizada)
+# Hospedagem: Render.com free tier (512MB RAM)
+#
+# IMPORTANTE: sentence-transformers + faiss-cpu = ~800MB — acima do limite do Render.
+# Ambos usam lazy loading — carregados apenas na primeira query de memória vetorial.
+# NÃO importar no módulo top-level; usar importlib.import_module() sob demanda.
+ 
+# ── Web framework ─────────────────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.0
+ 
+# ── LLM Provider: OpenRouter (compatível com openai SDK) ─────────────────────
+# REMOVIDO: groq>=0.9.0  ← SDK Groq desnecessário com OpenRouter
+openai==1.30.0          # OpenRouter usa client openai com base_url customizada
+ 
+# ── HTTP client ───────────────────────────────────────────────────────────────
+httpx==0.27.0
+ 
+# ── Memória vetorial (lazy load — NÃO importar no top-level) ─────────────────
+faiss-cpu==1.8.0
+sentence-transformers==2.7.0
+ 
+# ── Utilitários ───────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
