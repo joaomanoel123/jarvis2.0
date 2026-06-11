@@ -1,14 +1,24 @@
+# === ARQUIVO: backend/core/orchestrator.py ===
+"""
+Orquestrador de agentes do JARVIS 2.0.
+Coordena PlannerAgent, ExecutorAgent, KnowledgeAgent e MemoryAgent.
+"""
 
 import asyncio
+import logging
 from agents.planner import PlannerAgent
 from agents.executor import ExecutorAgent
 from agents.knowledge import KnowledgeAgent
 from agents.memory import MemoryAgent
 from core.llm_manager import LLMManager
 
+logger = logging.getLogger(__name__)
+
+
 class Orchestrator:
     """
     Orquestra o fluxo de trabalho entre os diferentes agentes.
+    Recebe mensagem do usuário → planeja → executa → sintetiza → retorna.
     """
 
     def __init__(self):
@@ -22,12 +32,6 @@ class Orchestrator:
     async def handle_message(self, user_input: str) -> str:
         """
         Processa a mensagem do usuário e retorna a resposta do assistente.
-
-        Args:
-            user_input: A mensagem enviada pelo usuário.
-
-        Returns:
-            A resposta do assistente.
         """
         self.memory_agent.add_message("user", user_input)
 
@@ -35,32 +39,42 @@ class Orchestrator:
 
         results = []
         for task in plan:
-            result = await self.executor_agent.execute(task)
-            results.append(result)
+            try:
+                result = await self.executor_agent.execute(task)
+                results.append(result)
+            except Exception as e:
+                logger.warning("ExecutorAgent falhou na task '%s': %s", task, e)
+                results.append(None)
 
-        # Agrega os resultados e gera uma resposta final
         final_response = await self._generate_final_response(user_input, results)
-        
         self.memory_agent.add_message("assistant", final_response)
         return final_response
 
     async def _generate_final_response(self, user_input: str, execution_results: list) -> str:
         """
-        Gera a resposta final para o usuário com base nos resultados da execução.
+        Gera a resposta final com base nos resultados dos agentes.
         """
-        context = "\n".join(execution_results)
+        context = "\n".join(str(r) for r in execution_results if r is not None)
         conversation_history = self.memory_agent.get_conversation_history()
 
-        prompt = f\"""Based on the following context and conversation history, provide a comprehensive answer to the user's request.
+        prompt = (
+            "Based on the following context and conversation history, "
+            "provide a comprehensive answer to the user's request.\n\n"
+            "Conversation History:\n"
+            + conversation_history
+            + "\n\nExecution Results:\n"
+            + (context if context else "No additional context available.")
+            + "\n\nUser Request: "
+            + user_input
+            + "\n\nAnswer:"
+        )
 
-        Conversation History:
-        {conversation_history}
-
-        Execution Results:
-        {context}
-
-        User Request: {user_input}
-
-        Answer:"""\n
-        response = await self.llm_manager.query(prompt)
-        return response
+        try:
+            response = await self.llm_manager.query(prompt)
+            return response
+        except Exception as e:
+            logger.error("LLMManager.query falhou: %s", e, exc_info=True)
+            return (
+                "JARVIS está temporariamente indisponível. "
+                "Tente novamente em alguns instantes."
+            )
