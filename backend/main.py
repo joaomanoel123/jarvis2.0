@@ -41,11 +41,11 @@ except Exception as e:
 
 app = FastAPI(title="JARVIS 2.0 API", version="2.0.0")
 
-origins = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN and FRONTEND_ORIGIN != "*" else ["*"]
+origins = [**]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
