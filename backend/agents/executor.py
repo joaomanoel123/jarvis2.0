@@ -1,15 +1,18 @@
-
-import asyncio
+# === ARQUIVO: backend/agents/executor.py ===
+"""
+ExecutorAgent — executa acoes externas (APIs, buscas, calculos).
+Stub funcional: retorna a task sem processamento externo.
+"""
 import logging
- 
+
 logger = logging.getLogger(__name__)
+
+
 class ExecutorAgent:
-   async def execute(self, task: str) -> str:
+    async def execute(self, task: str) -> str:
         """
         Executa uma subtarefa e retorna o resultado como string.
-        Versão atual: stub — retorna a task sem chamadas externas.
+        Versao atual: stub — retorna a task sem chamadas externas.
         """
         logger.info("ExecutorAgent: executando task '%s'", task[:50])
-       
-         return task
- 
+        return task
