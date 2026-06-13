@@ -11,35 +11,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 logger.info("=== JARVIS 2.0 iniciando boot ===")
-logger.info("Python: %s", sys.version)
-logger.info("CWD: %s", os.getcwd())
 
-try:
-    from fastapi import FastAPI
-    logger.info("fastapi OK")
-    from fastapi.middleware.cors import CORSMiddleware
-    logger.info("cors OK")
-    from pydantic import BaseModel
-    logger.info("pydantic OK")
-except Exception as e:
-    logger.error("FALHA ao importar FastAPI/pydantic: %s", e)
-    sys.exit(1)
+from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from core.orchestrator import Orchestrator
+from settings import validate_settings, OPENROUTER_MODEL, FRONTEND_ORIGIN
 
-try:
-    from core.orchestrator import Orchestrator
-    logger.info("Orchestrator OK")
-except Exception as e:
-    logger.error("FALHA ao importar Orchestrator: %s", e, exc_info=True)
-    sys.exit(1)
-
-try:
-    from settings import validate_settings, OPENROUTER_MODEL, FRONTEND_ORIGIN
-    logger.info("settings OK — modelo: %s", OPENROUTER_MODEL)
-except Exception as e:
-    logger.error("FALHA ao importar settings: %s", e, exc_info=True)
-    sys.exit(1)
-
-app = FastAPI(title="JARVIS 2.0 API", version="2.0.0")
+app = FastAPI(title="JARVIS 2.0 API", version="2.1.0")
 
 origins = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN and FRONTEND_ORIGIN != "*" else ["*"]
 app.add_middleware(
@@ -54,15 +33,16 @@ orchestrator = Orchestrator()
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message:    str
+    session_id: str = "default"
 
 
 @app.on_event("startup")
 async def startup_event():
     errors = validate_settings()
     if errors:
-        for err in errors:
-            logger.warning("CONFIG: %s", err)
+        for e in errors:
+            logger.warning("CONFIG: %s", e)
     else:
         logger.info("Configuracao validada. Modelo: %s", OPENROUTER_MODEL)
 
@@ -70,36 +50,71 @@ async def startup_event():
 @app.get("/")
 async def root():
     return {
-        "status": "online",
+        "status":  "online",
         "message": "J.A.R.V.I.S API esta funcionando!",
-        "endpoints": ["/", "/chat", "/health", "/memory"],
+        "endpoints": ["/", "/chat", "/upload", "/health", "/memory"],
     }
 
 
 @app.get("/health")
-async def health_check():
+async def health():
     return {"status": "online"}
 
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    if not request.message or not request.message.strip():
+    if not request.message.strip():
         return {"error": "Mensagem vazia.", "status": "error"}
     try:
-        response = await orchestrator.handle_message(request.message)
+        response = await orchestrator.handle_message(
+            request.message, request.session_id
+        )
         return {"response": response, "status": "success"}
     except Exception as e:
-        logger.error("Erro no /chat: %s", e, exc_info=True)
+        logger.error("Erro /chat: %s", e, exc_info=True)
         return {"error": "Erro interno.", "status": "error"}
 
 
-@app.get("/memory")
-async def get_memory():
+@app.post("/upload")
+async def upload_document(
+    file: UploadFile = File(...),
+    session_id: str  = Form("default"),
+):
+    """Recebe documento (PDF ou TXT), extrai texto e indexa no RAG."""
     try:
-        return orchestrator.memory_agent.get_short_term_memory()
+        content = await file.read()
+        text    = ""
+
+        if file.filename.endswith(".pdf"):
+            try:
+                import io
+                import pdfplumber
+                with pdfplumber.open(io.BytesIO(content)) as pdf:
+                    text = "\n".join(
+                        page.extract_text() or "" for page in pdf.pages
+                    )
+            except ImportError:
+                return {"error": "pdfplumber nao instalado.", "status": "error"}
+        else:
+            text = content.decode("utf-8", errors="ignore")
+
+        if not text.strip():
+            return {"error": "Documento vazio ou nao legivel.", "status": "error"}
+
+        added = await orchestrator.knowledge_agent.add_document(text)
+        return {
+            "status":  "success",
+            "message": f"{added} chunks indexados de '{file.filename}'.",
+            "chunks":  added,
+        }
     except Exception as e:
-        logger.error("Erro no /memory: %s", e)
-        return []
+        logger.error("Erro /upload: %s", e, exc_info=True)
+        return {"error": "Falha ao processar documento.", "status": "error"}
+
+
+@app.get("/memory")
+async def get_memory(session_id: str = "default"):
+    return orchestrator.memory_agent.get_short_term_memory()
 
 
 if __name__ == "__main__":
