@@ -9,16 +9,16 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 logger = logging.getLogger(__name__)
-
 logger.info("=== JARVIS 2.0 iniciando boot ===")
 
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from core.orchestrator import Orchestrator
+from core.tts_manager  import text_to_speech
 from settings import validate_settings, OPENROUTER_MODEL, FRONTEND_ORIGIN
 
-app = FastAPI(title="JARVIS 2.0 API", version="2.1.0")
+app = FastAPI(title="JARVIS 2.0 API", version="2.2.0")
 
 origins = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN and FRONTEND_ORIGIN != "*" else ["*"]
 app.add_middleware(
@@ -35,6 +35,7 @@ orchestrator = Orchestrator()
 class ChatRequest(BaseModel):
     message:    str
     session_id: str = "default"
+    tts:        bool = False  # frontend pede audio quando True
 
 
 @app.on_event("startup")
@@ -69,7 +70,18 @@ async def chat(request: ChatRequest):
         response = await orchestrator.handle_message(
             request.message, request.session_id
         )
-        return {"response": response, "status": "success"}
+
+        result = {"response": response, "status": "success"}
+
+        # Gerar audio TTS se solicitado
+        if request.tts:
+            audio_b64 = await text_to_speech(response)
+            if audio_b64:
+                result["audio"] = audio_b64
+                result["audio_format"] = "mp3"
+
+        return result
+
     except Exception as e:
         logger.error("Erro /chat: %s", e, exc_info=True)
         return {"error": "Erro interno.", "status": "error"}
@@ -80,26 +92,23 @@ async def upload_document(
     file: UploadFile = File(...),
     session_id: str  = Form("default"),
 ):
-    """Recebe documento (PDF ou TXT), extrai texto e indexa no RAG."""
+    """Recebe PDF ou TXT e indexa no RAG."""
     try:
         content = await file.read()
         text    = ""
 
         if file.filename.endswith(".pdf"):
             try:
-                import io
-                import pdfplumber
+                import io, pdfplumber
                 with pdfplumber.open(io.BytesIO(content)) as pdf:
-                    text = "\n".join(
-                        page.extract_text() or "" for page in pdf.pages
-                    )
+                    text = "\n".join(p.extract_text() or "" for p in pdf.pages)
             except ImportError:
                 return {"error": "pdfplumber nao instalado.", "status": "error"}
         else:
             text = content.decode("utf-8", errors="ignore")
 
         if not text.strip():
-            return {"error": "Documento vazio ou nao legivel.", "status": "error"}
+            return {"error": "Documento vazio.", "status": "error"}
 
         added = await orchestrator.knowledge_agent.add_document(text)
         return {
