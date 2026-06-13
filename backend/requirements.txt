@@ -7,3 +7,4 @@ python-dotenv>=1.0.1
 firebase-admin>=6.5.0
 google-cloud-firestore>=2.16.0
 pdfplumber>=0.11.0
+python-multipart>=0.0.12
