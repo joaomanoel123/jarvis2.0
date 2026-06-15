@@ -1,7 +1,7 @@
 {
   "hosting": {
     "public": "default",
-    "ignore": ["firebase.json", ".firebaserc", "*.md", "*.txt"],
+    "ignore": ["firebase.json", ".firebaserc", "*.md"],
     "rewrites": [
       { "source": "**", "destination": "/index.html" }
     ],
@@ -11,16 +11,18 @@
         "headers": [
           {
             "key": "Content-Security-Policy",
-            "value": "connect-src 'self' https://jarvis-tdgt.onrender.com https://*.run.app"
+            "value": "connect-src 'self' https://jarvis-tdgt.onrender.com https://*.run.app https://cdn.jsdelivr.net https://storage.googleapis.com https://openrouter.ai https://api.elevenlabs.io; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; worker-src blob: 'self'; wasm-unsafe-eval 'self'"
           },
           { "key": "X-Frame-Options", "value": "DENY" },
           { "key": "X-Content-Type-Options", "value": "nosniff" }
         ]
       },
       {
-        "source": "**/*.@(js|css)",
+        "source": "**/*.@(js|css|wasm)",
         "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=604800" }
+          { "key": "Cache-Control", "value": "public, max-age=604800" },
+          { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" },
+          { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" }
         ]
       }
     ]
