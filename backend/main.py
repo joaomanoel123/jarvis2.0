@@ -2,27 +2,7 @@
 import logging
 import os
 import sys
-import httpx  # adiciona no topo
-from fastapi import FastAPI, UploadFile, File, Form, Request
-
-@app.post("/vision")
-async def vision_proxy(request: Request):
-    body = await request.body()
-    roboflow_key = os.environ.get("ROBOFLOW_API_KEY", "")
-    if not roboflow_key:
-        return {"predictions": []}
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            res = await client.post(
-                f"https://detect.roboflow.com/coco/14?api_key={roboflow_key}",
-                content=body,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
-            return res.json()
-    except Exception as e:
-        logger.warning("Vision proxy erro: %s", e)
-        return {"predictions": []}
-
+import httpx
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,15 +11,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 logger.info("=== JARVIS 2.0 iniciando boot ===")
-from fastapi import FastAPI, UploadFile, File, Form
+
+from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response  # ← ADICIONADO
+from fastapi.responses import Response
 from pydantic import BaseModel
 from core.orchestrator import Orchestrator
 from core.tts_manager  import text_to_speech
 from settings import validate_settings, OPENROUTER_MODEL, FRONTEND_ORIGIN
 
-app = FastAPI(title="JARVIS 2.0 API", version="2.2.0")
+app = FastAPI(title="JARVIS 2.0 API", version="2.3.0")
 
 origins = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN and FRONTEND_ORIGIN != "*" else ["*"]
 app.add_middleware(
@@ -56,7 +37,7 @@ class ChatRequest(BaseModel):
     message:    str
     session_id: str = "default"
     tts:        bool = False
-    history:    list = []  # ← ADICIONADO (Fix 3 do jarvis.js)
+    history:    list = []
 
 @app.on_event("startup")
 async def startup_event():
@@ -72,14 +53,13 @@ async def root():
     return {
         "status":  "online",
         "message": "J.A.R.V.I.S API esta funcionando!",
-        "endpoints": ["/", "/chat", "/upload", "/health", "/memory", "/config.js"],
+        "endpoints": ["/", "/chat", "/upload", "/health", "/memory", "/config.js", "/vision"],
     }
 
 @app.get("/health")
 async def health():
     return {"status": "online"}
 
-# ── Config endpoint — injeta env vars no frontend ─────────────────────────────
 @app.get("/config.js")
 async def config_js():
     roboflow_key = os.environ.get("ROBOFLOW_API_KEY", "")
@@ -89,6 +69,25 @@ async def config_js():
   "roboflowKey": "{roboflow_key}"
 }};"""
     return Response(content=js, media_type="application/javascript")
+
+@app.post("/vision")
+async def vision_proxy(request: Request):
+    """Proxy para Roboflow — evita CORS e mantém a key no servidor."""
+    body = await request.body()
+    roboflow_key = os.environ.get("ROBOFLOW_API_KEY", "")
+    if not roboflow_key:
+        return {"predictions": []}
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            res = await client.post(
+                f"https://detect.roboflow.com/coco/14?api_key={roboflow_key}",
+                content=body,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            return res.json()
+    except Exception as e:
+        logger.warning("Vision proxy erro: %s", e)
+        return {"predictions": []}
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
