@@ -2,6 +2,28 @@
 import logging
 import os
 import sys
+import httpx  # adiciona no topo
+from fastapi import FastAPI, UploadFile, File, Form, Request
+
+@app.post("/vision")
+async def vision_proxy(request: Request):
+    body = await request.body()
+    roboflow_key = os.environ.get("ROBOFLOW_API_KEY", "")
+    if not roboflow_key:
+        return {"predictions": []}
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            res = await client.post(
+                f"https://detect.roboflow.com/coco/14?api_key={roboflow_key}",
+                content=body,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            return res.json()
+    except Exception as e:
+        logger.warning("Vision proxy erro: %s", e)
+        return {"predictions": []}
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
