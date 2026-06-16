@@ -2,7 +2,6 @@
 import logging
 import os
 import sys
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -10,9 +9,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 logger.info("=== JARVIS 2.0 iniciando boot ===")
-
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response  # ← ADICIONADO
 from pydantic import BaseModel
 from core.orchestrator import Orchestrator
 from core.tts_manager  import text_to_speech
@@ -31,12 +30,11 @@ app.add_middleware(
 
 orchestrator = Orchestrator()
 
-
 class ChatRequest(BaseModel):
     message:    str
     session_id: str = "default"
-    tts:        bool = False  # frontend pede audio quando True
-
+    tts:        bool = False
+    history:    list = []  # ← ADICIONADO (Fix 3 do jarvis.js)
 
 @app.on_event("startup")
 async def startup_event():
@@ -47,20 +45,28 @@ async def startup_event():
     else:
         logger.info("Configuracao validada. Modelo: %s", OPENROUTER_MODEL)
 
-
 @app.get("/")
 async def root():
     return {
         "status":  "online",
         "message": "J.A.R.V.I.S API esta funcionando!",
-        "endpoints": ["/", "/chat", "/upload", "/health", "/memory"],
+        "endpoints": ["/", "/chat", "/upload", "/health", "/memory", "/config.js"],
     }
-
 
 @app.get("/health")
 async def health():
     return {"status": "online"}
 
+# ── Config endpoint — injeta env vars no frontend ─────────────────────────────
+@app.get("/config.js")
+async def config_js():
+    roboflow_key = os.environ.get("ROBOFLOW_API_KEY", "")
+    api_url = os.environ.get("API_URL", "https://jarvis-tdgt.onrender.com")
+    js = f"""window.__JARVIS_CONFIG__ = {{
+  "apiUrl": "{api_url}",
+  "roboflowKey": "{roboflow_key}"
+}};"""
+    return Response(content=js, media_type="application/javascript")
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
@@ -70,22 +76,16 @@ async def chat(request: ChatRequest):
         response = await orchestrator.handle_message(
             request.message, request.session_id
         )
-
         result = {"response": response, "status": "success"}
-
-        # Gerar audio TTS se solicitado
         if request.tts:
             audio_b64 = await text_to_speech(response)
             if audio_b64:
                 result["audio"] = audio_b64
                 result["audio_format"] = "mp3"
-
         return result
-
     except Exception as e:
         logger.error("Erro /chat: %s", e, exc_info=True)
         return {"error": "Erro interno.", "status": "error"}
-
 
 @app.post("/upload")
 async def upload_document(
@@ -96,7 +96,6 @@ async def upload_document(
     try:
         content = await file.read()
         text    = ""
-
         if file.filename.endswith(".pdf"):
             try:
                 import io, pdfplumber
@@ -106,10 +105,8 @@ async def upload_document(
                 return {"error": "pdfplumber nao instalado.", "status": "error"}
         else:
             text = content.decode("utf-8", errors="ignore")
-
         if not text.strip():
             return {"error": "Documento vazio.", "status": "error"}
-
         added = await orchestrator.knowledge_agent.add_document(text)
         return {
             "status":  "success",
@@ -120,11 +117,9 @@ async def upload_document(
         logger.error("Erro /upload: %s", e, exc_info=True)
         return {"error": "Falha ao processar documento.", "status": "error"}
 
-
 @app.get("/memory")
 async def get_memory(session_id: str = "default"):
     return orchestrator.memory_agent.get_short_term_memory()
-
 
 if __name__ == "__main__":
     import uvicorn
