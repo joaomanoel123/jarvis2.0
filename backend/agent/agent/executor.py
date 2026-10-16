@@ -21,6 +21,7 @@ import json
 import logging
 from typing import Any
 
+from agent.astcheck import decorator_changes
 from agent.planner import AgentPlanner
 from agent.policy import is_protected
 from core.llm_manager import LLMManager
@@ -63,6 +64,10 @@ Regras para "modify":
 - Cada "find" deve aparecer UMA unica vez no arquivo; inclua linhas vizinhas se precisar torna-lo unico.
 - Use trechos curtos (poucas linhas). Para inserir codigo, use como "find" uma linha ancora existente e repita-a INTEGRALMENTE no "replace" junto com o codigo novo (nunca altere nem quebre a linha ancora).
 - O arquivo resultante deve continuar sintaticamente valido.
+- NUNCA use uma linha de decorador (que comeca com @) como ancora para inserir codigo DEPOIS dela:
+  isso separa o decorador da sua funcao. Para adicionar uma funcao nova antes de uma funcao decorada,
+  use o decorador como "find" e, no "replace", coloque o codigo novo PRIMEIRO e repita o decorador
+  original no FINAL, imediatamente acima da funcao existente.
 - Use o framework e as bibliotecas do projeto (contexto de stack). Nunca troque de framework.
 - Nunca inclua segredos, chaves de API ou credenciais.
 - Nao invente mudancas fora do escopo do passo.
@@ -125,7 +130,8 @@ class AgentExecutor:
                 return base
 
             base["explanation"] = str(data.get("explanation", ""))
-            for key in ("apply_error", "edits", "full_content", "resulting_content"):
+            for key in ("apply_error", "edits", "full_content", "resulting_content",
+                        "original_content"):
                 base.pop(key, None)
 
             try:
@@ -144,6 +150,8 @@ class AgentExecutor:
                     base["edits"] = edits
 
                 base["resulting_content"] = new_content
+                if action == "modify":
+                    base["original_content"] = old_content
                 base["diff"] = self._make_diff(path, old_content, new_content)
 
                 syntax_error = self._syntax_error(path, new_content)
@@ -151,7 +159,20 @@ class AgentExecutor:
                     feedback = f"o arquivo resultante teria erro de sintaxe: {syntax_error}"
                     logger.info("Executor: retry de '%s' (%s)", path, feedback)
                     continue
-                return base  # se ainda houver erro de sintaxe, o Verifier reprova
+
+                if action == "modify" and path.endswith(".py") and not syntax_error:
+                    changed = decorator_changes(old_content, new_content)
+                    if changed and not last:
+                        feedback = (
+                            "a edicao alterou decoradores de funcoes existentes ("
+                            + "; ".join(changed)
+                            + "). Nao use uma linha de decorador como ancora para inserir codigo "
+                            "depois dela; insira o codigo novo ANTES do decorador."
+                        )
+                        logger.info("Executor: retry de '%s' (%s)", path, feedback)
+                        continue
+
+                return base  # se ainda houver problema, o Verifier reprova
 
             except ValueError as e:
                 base["apply_error"] = str(e)
