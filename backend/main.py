@@ -17,7 +17,11 @@ from pydantic import BaseModel
 from core.orchestrator import Orchestrator
 from core.tts_manager  import text_to_speech
 from settings import validate_settings, OPENROUTER_MODEL, FRONTEND_ORIGIN
-from agent.router import agent_router  # JARVIS 3.0 Fase 1 — Agent Orchestrator
+try:
+    from agent.router import agent_router  # JARVIS 3.0 Fase 1 — Agent Orchestrator
+except Exception as _agent_err:  # modulo opcional: nunca derruba o JARVIS 2.0
+    agent_router = None
+    logger.warning("Modulo /agent indisponivel (JARVIS 3.0 desativado): %s", _agent_err)
 
 app = FastAPI(title="JARVIS 2.0 API", version="2.3.0")
 
@@ -30,7 +34,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(agent_router)  # expoe /agent/plan, /agent/propose, /agent/review
+if agent_router is not None:
+    app.include_router(agent_router)  # expoe /agent/plan, /agent/propose, /agent/review
 
 orchestrator = Orchestrator()
 
