@@ -1,59 +1,102 @@
-# === ARQUIVO: backend/agents/executor.py ===
+# === ARQUIVO: backend/agent/executor.py ===
 """
-ExecutorAgent — executa acoes externas.
-Suporta: busca web via DuckDuckGo (sem API key necessaria).
+AgentExecutor — JARVIS 3.0 Fase 1
+
+Recebe um passo do plano e GERA UM DIFF PROPOSTO via LLM.
+NAO escreve em disco, NAO executa comandos, NAO toca em git.
+Apenas simula/propoe — a aplicacao real fica para uma fase futura,
+com sandbox Docker isolado e aprovacao humana explicita.
 """
+
 import logging
-import httpx
+from typing import Any
+
+from core.llm_manager import LLMManager
 
 logger = logging.getLogger(__name__)
 
-DDGO_URL = "https://api.duckduckgo.com/"
+EXECUTOR_SYSTEM_PROMPT = """Voce e o modulo EXECUTOR de um agente autonomo de programacao chamado JARVIS 3.0.
+
+Voce recebe UM passo de um plano e deve propor as mudancas de codigo necessarias,
+no formato de diff unificado (unified diff, estilo "git diff").
+
+Voce NAO tem acesso ao sistema de arquivos real. Baseie-se apenas na descricao
+do passo e, se fornecido, no conteudo atual do arquivo.
+
+Responda SEMPRE em JSON valido, neste formato:
+{
+  "file": "caminho/relativo/arquivo.py",
+  "action": "create | modify | delete",
+  "diff": "--- a/caminho/relativo/arquivo.py\\n+++ b/caminho/relativo/arquivo.py\\n@@ ...\\n",
+  "explanation": "o que a mudanca faz e por que",
+  "requires_approval": true
+}
+
+Regras:
+- "diff" deve estar em formato unified diff valido (pode ser vazio se action = "create"
+  e nesse caso incluir o conteudo completo proposto no campo "full_content" tambem).
+- "requires_approval" e SEMPRE true nesta fase — nenhuma mudanca e aplicada automaticamente.
+- Nunca inclua segredos, chaves de API ou credenciais reais no diff.
+- Nao invente mudancas fora do escopo do passo recebido.
+- Nao inclua texto fora do JSON. Nao use markdown (sem ```)."""
 
 
-class ExecutorAgent:
+class AgentExecutor:
+    def __init__(self, llm_manager: LLMManager | None = None):
+        self.llm = llm_manager or LLMManager()
 
-    async def execute(self, task: str) -> str:
-        """Executa a task — por padrao retorna a task sem processamento."""
-        return task
-
-    async def web_search(self, query: str, max_results: int = 4) -> str:
+    async def propose_change(
+        self, step: dict[str, Any], current_file_content: str | None = None
+    ) -> dict[str, Any]:
         """
-        Busca informacoes na web via DuckDuckGo Instant Answer API.
-        Nao requer API key — gratuito e sem rate limit agressivo.
+        Gera uma proposta de diff para um unico passo do plano.
+        Retorna sempre um dict com 'requires_approval': True — nada e aplicado aqui.
         """
-        logger.info("ExecutorAgent web_search: '%s'", query[:60])
+        from agent.planner import AgentPlanner  # import local evita ciclo
+
+        context = ""
+        if current_file_content:
+            trimmed = current_file_content[:4000]
+            context = f"\n\nConteudo atual do arquivo (pode estar truncado):\n\"\"\"\n{trimmed}\n\"\"\"\n"
+
+        prompt = (
+            f"{EXECUTOR_SYSTEM_PROMPT}\n\n"
+            f"Passo do plano:\n{step}\n"
+            f"{context}\n"
+            f"Gere a proposta de diff em JSON agora."
+        )
+
         try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.get(DDGO_URL, params={
-                    "q": query,
-                    "format": "json",
-                    "no_redirect": "1",
-                    "no_html": "1",
-                    "skip_disambig": "1",
-                })
-                data = resp.json()
-
-            results = []
-
-            # Abstract (resposta direta)
-            if data.get("Abstract"):
-                results.append(f"Resumo: {data['Abstract']}")
-
-            # Answer (resposta curta)
-            if data.get("Answer"):
-                results.append(f"Resposta: {data['Answer']}")
-
-            # Related topics
-            for topic in data.get("RelatedTopics", [])[:max_results]:
-                if isinstance(topic, dict) and topic.get("Text"):
-                    results.append(topic["Text"])
-
-            if results:
-                return "Resultados da busca web:\n" + "\n".join(f"- {r}" for r in results)
-            else:
-                return f"Nenhum resultado encontrado para: {query}"
-
+            raw = await self.llm.query(prompt)
+            proposal = AgentPlanner._parse_json(raw)  # reaproveita parser robusto
         except Exception as e:
-            logger.warning("ExecutorAgent web_search falhou: %s", e)
-            return f"Falha na busca web para: {query}"
+            logger.error("Executor: falha ao gerar/parsear diff: %s", e, exc_info=True)
+            return {
+                "file": step.get("target_files", ["desconhecido"])[0]
+                if step.get("target_files")
+                else "desconhecido",
+                "action": step.get("action", "modify"),
+                "diff": "",
+                "explanation": f"Falha ao gerar proposta automaticamente: {e}",
+                "requires_approval": True,
+                "error": True,
+            }
+
+        # Forca sempre aprovacao manual, independente do que o LLM respondeu
+        proposal["requires_approval"] = True
+        proposal.setdefault("file", "desconhecido")
+        proposal.setdefault("action", step.get("action", "modify"))
+        proposal.setdefault("diff", "")
+        proposal.setdefault("explanation", "")
+        return proposal
+
+    async def propose_plan_changes(
+        self, plan: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """Gera uma proposta de diff para cada passo do plano, em sequencia."""
+        proposals = []
+        for step in plan.get("steps", []):
+            proposal = await self.propose_change(step)
+            proposal["step_id"] = step.get("id")
+            proposals.append(proposal)
+        return proposals

@@ -18,9 +18,9 @@ import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from agents.executor import AgentExecutor
-from agents.planner import AgentPlanner
-from agents.verifier import AgentVerifier
+from agent.executor import AgentExecutor
+from agent.planner import AgentPlanner
+from agent.verifier import AgentVerifier
 from core.llm_manager import LLMManager
 
 logger = logging.getLogger(__name__)
