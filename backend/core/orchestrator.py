@@ -5,10 +5,10 @@ Pipeline: Planner → RAG → Web Search → LLM → Memory Firestore.
 """
 import asyncio
 import logging
-from agents.planner   import PlannerAgent
-from agents.executor  import ExecutorAgent
-from agents.knowledge import KnowledgeAgent
-from agents.memory    import MemoryAgent
+from agent.planner   import PlannerAgent
+from agent.executor  import ExecutorAgent
+from agent.knowledge import KnowledgeAgent
+from agent.memory    import MemoryAgent
 from core.llm_manager import LLMManager
 
 logger = logging.getLogger(__name__)
