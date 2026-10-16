@@ -23,7 +23,10 @@ logger = logging.getLogger(__name__)
 
 API = "https://api.github.com"
 
-IGNORED_PREFIXES = (".git/", "node_modules/", "__pycache__/", "default/icons/")
+IGNORED_PREFIXES = (
+    ".git/", ".agents/", ".claude/", ".cursor/",
+    "node_modules/", "__pycache__/", "default/icons/",
+)
 IGNORED_EXT = (
     ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".woff", ".woff2",
     ".ttf", ".zip", ".pdf", ".mp3", ".mp4", ".lock", ".pyc",
