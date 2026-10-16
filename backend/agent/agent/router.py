@@ -155,6 +155,7 @@ async def propose_changes(request: TaskRequest):
 
     for p in data["proposals"]:
         p.pop("resulting_content", None)
+        p.pop("original_content", None)
     return {
         "status": "success",
         "context_files": data["ctx"]["context_files"],
@@ -177,6 +178,7 @@ async def full_review(request: TaskRequest):
     verification = _verifier.verify_all(data["plan"], data["proposals"], ctx["tree"], ctx["stack"])
     for p in data["proposals"]:
         p.pop("resulting_content", None)
+        p.pop("original_content", None)
 
     return {
         "status": "success",
