@@ -9,21 +9,27 @@ Em vez de pedir ao modelo um diff (que ele costuma inventar), pedimos
 edicoes "find/replace" sobre o conteudo REAL do arquivo. O proprio codigo:
   1. confere que cada trecho 'find' existe exatamente uma vez;
   2. aplica as edicoes em memoria;
-  3. gera o unified diff verdadeiro com difflib.
-Se o trecho nao bate, a proposta vem com 'apply_error' e o Verifier reprova.
+  3. confere a sintaxe Python do resultado;
+  4. gera o unified diff verdadeiro com difflib.
+Se algo falha, o modelo recebe o erro e tem UMA nova tentativa.
+Codigo do proprio agente (backend/agent/) e protegido e nunca e proposto.
 """
 
+import ast
 import difflib
 import json
 import logging
 from typing import Any
 
+from agent.astcheck import decorator_changes
 from agent.planner import AgentPlanner
+from agent.policy import is_protected
 from core.llm_manager import LLMManager
 
 logger = logging.getLogger(__name__)
 
 MAX_CONTEXT_CHARS = 12000
+MAX_ATTEMPTS = 2  # 1 tentativa + 1 retry com o erro como feedback
 
 EXECUTOR_SYSTEM_PROMPT = """Voce e o modulo EXECUTOR de um agente autonomo de programacao chamado JARVIS 3.0.
 
@@ -56,7 +62,12 @@ Responda SEMPRE em JSON valido, em UM dos formatos abaixo.
 Regras para "modify":
 - "find" deve ser copiado LITERALMENTE do conteudo atual (mesma indentacao e espacos).
 - Cada "find" deve aparecer UMA unica vez no arquivo; inclua linhas vizinhas se precisar torna-lo unico.
-- Use trechos curtos (poucas linhas). Para inserir codigo, use como "find" uma linha ancora existente e repita-a no "replace" junto com o codigo novo.
+- Use trechos curtos (poucas linhas). Para inserir codigo, use como "find" uma linha ancora existente e repita-a INTEGRALMENTE no "replace" junto com o codigo novo (nunca altere nem quebre a linha ancora).
+- O arquivo resultante deve continuar sintaticamente valido.
+- NUNCA use uma linha de decorador (que comeca com @) como ancora para inserir codigo DEPOIS dela:
+  isso separa o decorador da sua funcao. Para adicionar uma funcao nova antes de uma funcao decorada,
+  use o decorador como "find" e, no "replace", coloque o codigo novo PRIMEIRO e repita o decorador
+  original no FINAL, imediatamente acima da funcao existente.
 - Use o framework e as bibliotecas do projeto (contexto de stack). Nunca troque de framework.
 - Nunca inclua segredos, chaves de API ou credenciais.
 - Nao invente mudancas fora do escopo do passo.
@@ -86,6 +97,12 @@ class AgentExecutor:
             "requires_approval": True,  # SEMPRE true nesta fase
         }
 
+        if is_protected(path):
+            base["apply_error"] = (
+                f"'{path}' e codigo do proprio agente (protegido); passo nao proposto."
+            )
+            return base
+
         # modify/delete exigem o arquivo real
         if action in ("modify", "delete") and current_file_content is None:
             base["apply_error"] = (
@@ -99,35 +116,71 @@ class AgentExecutor:
             base["diff"] = self._make_diff(path, current_file_content or "", "")
             return base
 
-        prompt = self._build_prompt(step, current_file_content, stack_context)
-        try:
-            raw = await self.llm.query(prompt)
-            data = AgentPlanner._parse_json(raw)
-        except Exception as e:
-            logger.error("Executor: falha ao gerar/parsear proposta: %s", e, exc_info=True)
-            base["apply_error"] = f"Falha ao gerar proposta automaticamente: {e}"
-            return base
+        feedback = ""
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            last = attempt == MAX_ATTEMPTS
+            prompt = self._build_prompt(step, current_file_content, stack_context, feedback)
 
-        base["explanation"] = str(data.get("explanation", ""))
+            try:
+                raw = await self.llm.query(prompt)
+                data = AgentPlanner._parse_json(raw)
+            except Exception as e:
+                logger.error("Executor: falha ao gerar/parsear proposta: %s", e, exc_info=True)
+                base["apply_error"] = f"Falha ao gerar proposta automaticamente: {e}"
+                return base
 
-        try:
-            if action == "create":
-                content = data.get("full_content")
-                if not isinstance(content, str) or not content.strip():
-                    raise ValueError("Modelo nao devolveu 'full_content' para o arquivo novo.")
-                base["full_content"] = content
-                base["resulting_content"] = content
-                base["diff"] = self._make_diff(path, "", content)
-            else:  # modify
-                edits = data.get("edits")
-                if not isinstance(edits, list) or not edits:
-                    raise ValueError("Modelo nao devolveu 'edits' para o arquivo existente.")
-                new_content = self._apply_edits(current_file_content or "", edits)
-                base["edits"] = edits
+            base["explanation"] = str(data.get("explanation", ""))
+            for key in ("apply_error", "edits", "full_content", "resulting_content",
+                        "original_content"):
+                base.pop(key, None)
+
+            try:
+                if action == "create":
+                    content = data.get("full_content")
+                    if not isinstance(content, str) or not content.strip():
+                        raise ValueError("Modelo nao devolveu 'full_content' para o arquivo novo.")
+                    new_content, old_content = content, ""
+                    base["full_content"] = content
+                else:  # modify
+                    edits = data.get("edits")
+                    if not isinstance(edits, list) or not edits:
+                        raise ValueError("Modelo nao devolveu 'edits' para o arquivo existente.")
+                    old_content = current_file_content or ""
+                    new_content = self._apply_edits(old_content, edits)
+                    base["edits"] = edits
+
                 base["resulting_content"] = new_content
-                base["diff"] = self._make_diff(path, current_file_content or "", new_content)
-        except ValueError as e:
-            base["apply_error"] = str(e)
+                if action == "modify":
+                    base["original_content"] = old_content
+                base["diff"] = self._make_diff(path, old_content, new_content)
+
+                syntax_error = self._syntax_error(path, new_content)
+                if syntax_error and not last:
+                    feedback = f"o arquivo resultante teria erro de sintaxe: {syntax_error}"
+                    logger.info("Executor: retry de '%s' (%s)", path, feedback)
+                    continue
+
+                if action == "modify" and path.endswith(".py") and not syntax_error:
+                    changed = decorator_changes(old_content, new_content)
+                    if changed and not last:
+                        feedback = (
+                            "a edicao alterou decoradores de funcoes existentes ("
+                            + "; ".join(changed)
+                            + "). Nao use uma linha de decorador como ancora para inserir codigo "
+                            "depois dela; insira o codigo novo ANTES do decorador."
+                        )
+                        logger.info("Executor: retry de '%s' (%s)", path, feedback)
+                        continue
+
+                return base  # se ainda houver problema, o Verifier reprova
+
+            except ValueError as e:
+                base["apply_error"] = str(e)
+                base["diff"] = ""
+                if last:
+                    return base
+                feedback = str(e)
+                logger.info("Executor: retry de '%s' (%s)", path, feedback)
 
         return base
 
@@ -144,7 +197,8 @@ class AgentExecutor:
             targets = step.get("target_files") or []
             path = targets[0] if targets else None
             content = None
-            if reader and path and step.get("action") in ("modify", "delete"):
+            if (reader and path and not is_protected(path)
+                    and step.get("action") in ("modify", "delete")):
                 try:
                     content = await reader.read_file(path)
                 except Exception as e:  # leitura nunca derruba o pipeline
@@ -157,7 +211,7 @@ class AgentExecutor:
 
     # ------------------------------------------------------------------
     @staticmethod
-    def _build_prompt(step, current_content, stack_context) -> str:
+    def _build_prompt(step, current_content, stack_context, feedback: str = "") -> str:
         parts = [EXECUTOR_SYSTEM_PROMPT, ""]
         if stack_context:
             parts.append(f"Contexto de stack (dependencias do projeto):\n{stack_context}\n")
@@ -168,8 +222,23 @@ class AgentExecutor:
                 f"\nConteudo ATUAL do arquivo '{(step.get('target_files') or ['?'])[0]}':\n"
                 f"<<<ARQUIVO\n{shown}\nARQUIVO>>>"
             )
+        if feedback:
+            parts.append(
+                f"\nATENCAO: sua tentativa anterior falhou: {feedback}. "
+                "Corrija e responda novamente em JSON."
+            )
         parts.append("\nGere a proposta em JSON agora.")
         return "\n".join(parts)
+
+    @staticmethod
+    def _syntax_error(path: str, content: str) -> str | None:
+        if not path.endswith(".py"):
+            return None
+        try:
+            ast.parse(content)
+        except SyntaxError as e:
+            return f"{e.msg} (linha {e.lineno})"
+        return None
 
     @staticmethod
     def _apply_edits(original: str, edits: list[dict[str, Any]]) -> str:
