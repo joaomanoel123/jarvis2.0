@@ -17,6 +17,7 @@ import re
 import sys
 from typing import Any
 
+from agent.astcheck import decorator_changes
 from agent.policy import is_protected
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,12 @@ class AgentVerifier:
                 tree = ast.parse(resulting)
             except SyntaxError as e:
                 issues.append(f"Erro de sintaxe Python em '{path}' apos a mudanca: {e}")
+
+        # 5b. Decoradores de funcoes existentes nao podem mudar (ex.: rota que perde o @app.get)
+        original = proposal.get("original_content")
+        if tree is not None and action == "modify" and original:
+            for msg in decorator_changes(original, resulting):
+                issues.append(f"'{path}': {msg} (a mudanca pode quebrar uma rota/funcao existente).")
 
         # 6. Imports nao declarados (so se temos contexto de dependencias)
         if tree is not None and stack_context.strip():
