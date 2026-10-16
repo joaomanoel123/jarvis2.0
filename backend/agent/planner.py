@@ -1,10 +1,11 @@
 # === ARQUIVO: backend/agent/planner.py ===
 """
-AgentPlanner — JARVIS 3.0 Fase 1
+AgentPlanner — JARVIS 3.0
 
-Recebe uma tarefa de programacao em linguagem natural e, via OpenRouter
-(reaproveitando o LLMManager ja usado pelo JARVIS 2.0), devolve um PLANO
-ESTRUTURADO em JSON. Nao toca em arquivos, nao executa nada.
+Transforma uma tarefa em linguagem natural em um PLANO ESTRUTURADO (JSON),
+via OpenRouter (LLMManager do JARVIS 2.0). Recebe, opcionalmente, a arvore
+real de arquivos do repo e o contexto de stack (requirements/package.json)
+para planejar com caminhos e frameworks reais. Nao toca em arquivos.
 """
 
 import json
@@ -38,7 +39,11 @@ Responda SEMPRE em JSON valido, com exatamente este formato:
 }
 
 Regras:
-- "target_files" deve conter caminhos RELATIVOS plausiveis dentro do repositorio.
+- Cada passo deve ter EXATAMENTE 1 arquivo em "target_files".
+- Para "modify" e "delete", use SOMENTE caminhos que existam na lista de arquivos do repositorio.
+- Para "create", escolha um caminho coerente com a estrutura existente.
+- Use o framework e as bibliotecas que o projeto ja usa (veja o contexto de stack). Nao introduza outro framework.
+- Prefira o MENOR numero de passos possivel; nao divida em passos o que cabe em um so.
 - "risk" = "high" para qualquer passo que apague arquivos, mexa em autenticacao,
   segredos, configuracao de deploy ou infraestrutura.
 - Nao invente tarefas fora do pedido do usuario.
@@ -49,14 +54,25 @@ class AgentPlanner:
     def __init__(self, llm_manager: LLMManager | None = None):
         self.llm = llm_manager or LLMManager()
 
-    async def plan(self, task_description: str) -> dict[str, Any]:
+    async def plan(
+        self,
+        task_description: str,
+        file_tree: list[str] | None = None,
+        stack_context: str = "",
+    ) -> dict[str, Any]:
         """
-        Gera um plano estruturado para a tarefa descrita.
-        Nunca levanta excecao para o chamador — em falha, devolve um plano
-        de erro com steps vazios para o Orchestrator/endpoint tratar.
+        Gera um plano estruturado. Nunca levanta excecao: em falha devolve
+        um plano com steps vazios e "error": True.
         """
+        context = ""
+        if file_tree:
+            context += "Arquivos existentes no repositorio:\n" + "\n".join(file_tree) + "\n\n"
+        if stack_context:
+            context += f"Contexto de stack (dependencias do projeto):\n{stack_context}\n\n"
+
         prompt = (
             f"{PLANNER_SYSTEM_PROMPT}\n\n"
+            f"{context}"
             f"Tarefa solicitada pelo usuario:\n\"\"\"\n{task_description}\n\"\"\"\n\n"
             f"Gere o plano em JSON agora."
         )
@@ -65,7 +81,7 @@ class AgentPlanner:
             raw = await self.llm.query(prompt)
             plan = self._parse_json(raw)
             plan = self._validate_plan(plan)
-            logger.info("Planner: plano gerado com %d passo(s).", len(plan.get("steps", [])))
+            logger.info("Planner: plano com %d passo(s).", len(plan.get("steps", [])))
             return plan
         except Exception as e:
             logger.error("Planner: falha ao gerar/parsear plano: %s", e, exc_info=True)
@@ -81,8 +97,6 @@ class AgentPlanner:
     def _parse_json(raw: str) -> dict[str, Any]:
         """Extrai o primeiro bloco JSON valido da resposta do LLM."""
         text = raw.strip()
-
-        # Remove cercas de markdown, se o modelo ignorar a instrucao
         text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
 
         try:
@@ -90,14 +104,11 @@ class AgentPlanner:
         except json.JSONDecodeError:
             pass
 
-        # Fallback: extrai o maior trecho entre a primeira '{' e a ultima '}'
         start = text.find("{")
         end = text.rfind("}")
         if start == -1 or end == -1 or end <= start:
             raise ValueError("Resposta do LLM nao contem JSON reconhecivel.")
-
-        candidate = text[start : end + 1]
-        return json.loads(candidate)
+        return json.loads(text[start : end + 1])
 
     @staticmethod
     def _validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
@@ -117,11 +128,14 @@ class AgentPlanner:
         for i, step in enumerate(plan["steps"], start=1):
             if not isinstance(step, dict):
                 continue
+            targets = step.get("target_files", []) or []
+            if isinstance(targets, str):
+                targets = [targets]
             normalized_steps.append(
                 {
                     "id": step.get("id", i),
                     "description": str(step.get("description", "")).strip(),
-                    "target_files": step.get("target_files", []) or [],
+                    "target_files": targets,
                     "action": step.get("action", "modify"),
                     "risk": step.get("risk", "medium"),
                 }
